@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: "opc101akscluster-aca7"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "opc101akscluster-aca7"
+  template:
+    metadata:
+      labels:
+        app: "opc101akscluster-aca7"
+    spec:
+      containers:
+        - name: "opc101akscluster-aca7"
+          image: "opcvoteacrname.azurecr.io/opc101akscluster"
+          ports:
+          - containerPort: 80
