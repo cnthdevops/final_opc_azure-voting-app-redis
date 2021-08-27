@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: opcvoteacrname.azurecr.io
+        username: ${{ secrets.acr_opcvoteacrname_username }}
+        password: ${{ secrets.acr_opcvoteacrname_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/opc_azure-vote" -f  "opc_azure-vote/Dockerfile" -t opcvoteacrname.azurecr.io/opc101akscluster:${{ github.sha }} --label dockerfile-path=opc_azure-vote/Dockerfile
+        docker push opcvoteacrname.azurecr.io/opc101akscluster:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_opc101akscluster_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep default | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace default`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: default
+        container-registry-url: opcvoteacrname.azurecr.io
+        container-registry-username: ${{ secrets.acr_opcvoteacrname_username }}
+        container-registry-password: ${{ secrets.acr_opcvoteacrname_password }}
+        secret-name: opc101akscludockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: default
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          opcvoteacrname.azurecr.io/opc101akscluster:${{ github.sha }}
+        imagepullsecrets: |
+          opc101akscludockerauth
